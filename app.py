@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from groq import Groq
 from dotenv import load_dotenv
+import httpx
 
 # Load environment
 load_dotenv()
@@ -17,13 +18,11 @@ if not groq_api_key:
     st.error("❌ GROQ_API_KEY not found. Please set it in Streamlit Secrets or .env file.")
     st.stop()
 
-# --- FIX for Streamlit Cloud proxy bug ---
-os.environ.pop("HTTP_PROXY", None)
-os.environ.pop("HTTPS_PROXY", None)
-os.environ.pop("ALL_PROXY", None)
-
-# Initialize client
-client = Groq(api_key=groq_api_key)
+# Single client init with timeout (no max_retries to avoid arg error)
+client = Groq(
+    api_key=groq_api_key,
+    timeout=httpx.Timeout(30.0, read=10.0, write=10.0, connect=5.0)
+)
 
 st.set_page_config(page_title="AI CodeSense", page_icon="💡", layout="centered")
 
@@ -43,10 +42,7 @@ You are an AI coding assistant that explains programming errors in {level.lower(
 {tone}
 
 Error message:
-```
-{error}
-```
-
+    
 Please answer with these sections:
 1️⃣ Meaning (in simple English)
 2️⃣ Why it happened
@@ -79,13 +75,12 @@ with col2:
     mode = st.radio("⚙️ Model Mode", ["⚡ Fast (Llama-3.1-8B)", "🎯 Accurate (GPT-OSS-20B)"])
 
 # --- Buttons Section ---
-col1, col2 = st.columns([1, 1])  # Two equal columns
+col1, col2 = st.columns([1, 1])
 
 with col1:
     explain_btn = st.button("🔍 Explain Error", key="explain_btn", use_container_width=True)
 
 with col2:
-    # Use on_click to ensure state is cleared before next render
     clear_btn = st.button("🧹 Clear Text", key="clear_btn", use_container_width=True, on_click=clear_text)
 
 # --- Logic & Output ---
