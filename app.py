@@ -1,9 +1,12 @@
-import streamlit as st
+mport streamlit as st
 import os
 from groq import Groq
 from dotenv import load_dotenv
 
-# Load API key (from Streamlit secrets on Cloud or .env locally)
+# Load environment
+load_dotenv()
+
+# Load key from Streamlit secrets or .env
 groq_api_key = (
     st.secrets.get("GROQ_API_KEY")
     if "GROQ_API_KEY" in st.secrets
@@ -14,7 +17,12 @@ if not groq_api_key:
     st.error("❌ GROQ_API_KEY not found. Please set it in Streamlit Secrets or .env file.")
     st.stop()
 
-# Initialize Groq client
+# --- FIX for Streamlit Cloud proxy bug ---
+os.environ.pop("HTTP_PROXY", None)
+os.environ.pop("HTTPS_PROXY", None)
+os.environ.pop("ALL_PROXY", None)
+
+# Initialize client
 client = Groq(api_key=groq_api_key)
 
 st.set_page_config(page_title="AI CodeSense", page_icon="💡", layout="centered")
