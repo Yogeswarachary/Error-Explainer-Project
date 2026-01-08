@@ -38,7 +38,7 @@ meaning: "Trying to access list position that doesn't exist"
 fix_code: `for i in range(len(data)-1): print(data[i])`
 prevention: "Always use len() or enumerate() for safe indexing"
 
-####🔒 Enterprise Security
+#### 🔒 Enterprise Security
 
 | Feature        | Status                              |
 | -------------- | ----------------------------------- |
