@@ -1,3 +1,4 @@
+--upgrade-strategy only-if-needed
 streamlit==1.32.2
 groq==0.8.0
 python-dotenv==1.0.1
