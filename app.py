@@ -3,10 +3,18 @@ import os
 from groq import Groq
 from dotenv import load_dotenv
 
-# Load API Key
-load_dotenv()
-groq_api_key = os.getenv("GROQ_API_KEY")
+# Load API key (from Streamlit secrets on Cloud or .env locally)
+groq_api_key = (
+    st.secrets.get("GROQ_API_KEY")
+    if "GROQ_API_KEY" in st.secrets
+    else os.getenv("GROQ_API_KEY")
+)
 
+if not groq_api_key:
+    st.error("❌ GROQ_API_KEY not found. Please set it in Streamlit Secrets or .env file.")
+    st.stop()
+
+# Initialize Groq client
 client = Groq(api_key=groq_api_key)
 
 st.set_page_config(page_title="AI CodeSense", page_icon="💡", layout="centered")
