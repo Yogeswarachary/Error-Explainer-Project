@@ -25,13 +25,13 @@ that can explain the errors to learners (who practicing the code) in a simple an
    4. Optional: GROQ_PROXY_URL for private routing
 
 2. Local Development
-  > pip install -r requirements.txt
-  > streamlit run app.py
+   > pip install -r requirements.txt
+
+   > streamlit run app.py
 
 #### 📊 Usage Demo
-text
-❌ Error: "IndexError: list index out of range"
-📄 Code: for i in range(10): print(data[i+1])
+- ❌ Error: "IndexError: list index out of range"
+- 📄 Code: for i in range(10): print(data[i+1])
 
 #### ✅ AI Output:
 meaning: "Trying to access list position that doesn't exist"
@@ -48,11 +48,12 @@ prevention: "Always use len() or enumerate() for safe indexing"
 | Data Residency | ✅ No cloud storage                  |
 
 #### 🤝 Contributing
-1.Fork the repo
+1. Fork the repo
 2. Create feature branch (git checkout -b feature/AmazingFeature)
 3. Commit changes (git commit -m 'Add some AmazingFeature')
 4. Push (git push origin feature/AmazingFeature)
 5. Open Pull Request
 
-#### 👨‍💻 Author
-Yogeswarachary - Data Science & AI Developer
+#### Contact
+- Email: myogeswarachary@gmail.com
+- LinkedIn: https://www.linkedin.com/in/yogeswarachary-modepalli-4a91571b8/
