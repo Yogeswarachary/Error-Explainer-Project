@@ -21,6 +21,7 @@ def safe_get_secret(key, default=None):
         pass
     return os.getenv(key, default)
 
+# Get API Key
 groq_api_key = safe_get_secret("GROQ_API_KEY")
 if not groq_api_key:
     st.error("❌ GROQ_API_KEY required in secrets or .env file.")
