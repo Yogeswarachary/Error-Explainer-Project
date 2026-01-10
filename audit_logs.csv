@@ -1,0 +1,7 @@
+Timestamp,Input Length,PII Detected,Mode,Response Preview
+2026-01-10T12:43:51.251664,292,Yes,Privacy,Pending
+2026-01-10T12:43:51.869174,292,Yes,Error,Error code: 404 - {'error': {'message': 'Unknown request URL: POST /openai/v1/openai/v1/chat/complet
+2026-01-10T12:46:17.552213,292,Yes,Privacy,Pending
+2026-01-10T12:46:18.684933,292,Yes,Partial Success (Non-JSON),"**Error Explanation**
+
+The error is caused by a syntax issue in the code. The problem lies in the li"

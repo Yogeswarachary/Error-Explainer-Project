@@ -27,14 +27,18 @@ if not groq_api_key:
     st.stop()
 
 # Configs (enterprise overrides)
-GROQ_BASE_URL = safe_get_secret("GROQ_PROXY_URL", "https://api.groq.com/openai/v1")
+GROQ_BASE_URL = safe_get_secret("GROQ_PROXY_URL")
 LOG_FILE = "audit_logs.csv"
 
-client = Groq(
-    api_key=groq_api_key,
-    base_url=GROQ_BASE_URL,
-    timeout=httpx.Timeout(30.0)
-)
+# Initialize Groq client
+client_params = {
+    "api_key": groq_api_key,
+    "timeout": httpx.Timeout(30.0)
+}
+if GROQ_BASE_URL:
+    client_params["base_url"] = GROQ_BASE_URL
+
+client = Groq(**client_params)
 
 st.set_page_config(layout="wide", page_title="AI CodeSense Enterprise")
 
