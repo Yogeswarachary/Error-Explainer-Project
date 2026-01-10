@@ -1,128 +1,144 @@
 import streamlit as st
 import os
 import pandas as pd
+import re
+import csv
+import json
 from datetime import datetime
 from groq import Groq
 from dotenv import load_dotenv
+import httpx
 
-# File to store error logs
-LOG_FILE = "error_log.csv"
-
-# Initialize log file if it doesn't exist
-if not os.path.exists(LOG_FILE):
-    pd.DataFrame(columns=["Timestamp", "Error Message", "Level", "Model"]).to_csv(LOG_FILE, index=False)
-
-# Load API Key
+# Load environment
 load_dotenv()
-groq_api_key = os.getenv("GROQ_API_KEY")
 
-client = Groq(api_key=groq_api_key)
+def safe_get_secret(key, default=None):
+    """Safely get secrets from Streamlit or environment variables."""
+    try:
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    return os.getenv(key, default)
 
-st.set_page_config(page_title="AI CodeSense", page_icon="💡", layout="centered")
+groq_api_key = safe_get_secret("GROQ_API_KEY")
+if not groq_api_key:
+    st.error("❌ GROQ_API_KEY required in secrets or .env file.")
+    st.stop()
 
-st.title("💡 AI CodeSense — Explain Coding Errors in Plain English")
-st.caption("Powered by Groq API | Created by Yogeswarachary")
+# Configs (enterprise overrides)
+GROQ_BASE_URL = safe_get_secret("GROQ_PROXY_URL", "https://api.groq.com/openai/v1")
+LOG_FILE = "audit_logs.csv"
 
-# --- Helper Functions ---
-def build_prompt(error, level):
-    tone = {
-        "Beginner": "Explain like teaching a school student using simple words and examples.",
-        "Intermediate": "Use programming analogies and show quick fixes.",
-        "Advanced": "Be concise and technical, focus on root causes."
-    }[level]
-
-    prompt = f"""
-You are an AI coding assistant that explains programming errors in {level.lower()} terms.
-{tone}
-
-Error message:
-```
-{error}
-```
-
-Please answer with these sections:
-1️⃣ Meaning (in simple English)
-2️⃣ Why it happened
-3️⃣ 1️⃣-line fix or code correction
-4️⃣ Analogy (only if it helps)
-
-Keep it friendly, short, and clear.
-"""
-    return prompt
-
-def clear_text():
-    st.session_state.error_text = ""
-
-# --- Input Section ---
-if "error_text" not in st.session_state:
-    st.session_state.error_text = ""
-
-st.text_area(
-    "🧩 Paste your error message here:",
-    key="error_text",
-    height=200,
-    placeholder="Type or paste your compiler/interpreter error here...",
+client = Groq(
+    api_key=groq_api_key,
+    base_url=GROQ_BASE_URL,
+    timeout=httpx.Timeout(30.0)
 )
 
-# --- Settings Section ---
-col1, col2 = st.columns(2)
-with col1:
-    level = st.selectbox("🧠 Explanation Level", ["Beginner", "Intermediate", "Advanced"])
-with col2:
-    mode = st.radio("⚙️ Model Mode", ["⚡ Fast (Llama-3.1-8B)", "🎯 Accurate (GPT-OSS-20B)"])
+st.set_page_config(layout="wide", page_title="AI CodeSense Enterprise")
 
-# --- Buttons Section ---
-col1, col2 = st.columns([1, 1])  # Two equal columns
-
-with col1:
-    explain_btn = st.button("🔍 Explain Error", key="explain_btn", use_container_width=True)
-
-with col2:
-    # Use on_click to ensure state is cleared before next render
-    clear_btn = st.button("🧹 Clear Text", key="clear_btn", use_container_width=True, on_click=clear_text)
-
-# --- Logic & Output ---
-if explain_btn:
-    if not st.session_state.error_text.strip():
-        st.warning("Please enter an error message first.")
+# Sidebar: Privacy & Logs
+with st.sidebar:
+    st.header("🔒 Enterprise Controls")
+    privacy_mode = st.toggle("Privacy Mode (Anonymize PII)", value=True)
+    if privacy_mode:
+        st.success("✅ Inputs redacted before AI call")
+    
+    st.subheader("📊 Audit Logs")
+    if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > 0:
+        try:
+            df = pd.read_csv(LOG_FILE)
+            st.dataframe(df.tail(10))
+        except Exception as e:
+            st.error(f"Error reading logs: {e}")
     else:
-        with st.spinner("Analyzing your error..."):
-            prompt = build_prompt(st.session_state.error_text, level)
-            model = "llama-3.1-8b-instant" if "Fast" in mode else "gpt-oss-20b"
+        st.info("No logs yet.")
+
+st.title("💼 AI CodeSense Enterprise — Secure Code Fixing")
+st.caption("🔒 Confidential Mode | Proxy-Ready | Audit-Logged")
+
+# PII Redactor (regex for code-safe anonymization)
+def redact_pii(text):
+    patterns = {
+        r'api[_-]?key["\']?\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}': '[API_KEY]',
+        r'(https?://[^\s]+|www\.[^\s]+)': '[URL]',
+        r'\b[A-Z][a-z]+(?:[A-Z][a-z]+){2,}\b': '[COMPANY]',  # CamelCase companies
+        r'@\w+\.\w+': '[EMAIL]',
+        r'[A-Z]{3}\d{4,}': '[DB_FIELD]',  # e.g., ACC1234
+        r'(?:user|customer)_?id["\']?\s*[=:]\s*["\']?\d+': '[USER_ID]',
+        r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b': '[PHONE]'
+    }
+    for pattern, replacement in patterns.items():
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    return text
+
+def log_activity(user_input, redacted, response, mode):
+    file_exists = os.path.exists(LOG_FILE)
+    with open(LOG_FILE, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists or os.path.getsize(LOG_FILE) == 0:
+            writer.writerow(['Timestamp', 'Input Length', 'PII Detected', 'Mode', 'Response Preview'])
+        writer.writerow([datetime.now().isoformat(), len(user_input), 'Yes' if user_input != redacted else 'No', mode, response[:100]])
+
+# Inputs
+col1, col2 = st.columns(2)
+error_input = col1.text_area("❌ Error:", height=150, key="error")
+code_input = col2.text_area("📄 Code:", height=150, key="code")
+
+# Preview Redaction
+if privacy_mode:
+    redacted_error = redact_pii(error_input)
+    redacted_code = redact_pii(code_input)
+    with st.expander("👁️ Preview Redacted Input (sent to AI)"):
+        st.code(redacted_error + "\n\n" + redacted_code)
+
+# Settings & Buttons
+col1, col2, col3 = st.columns(3)
+level = col1.selectbox("Level", ["Beginner", "Intermediate", "Advanced"])
+model_name = col2.radio("Model", ["llama-3.1-8b-instant", "llama-3.1-70b-versatile"])
+analyze_btn = col3.button("🔍 Secure Analyze", use_container_width=True)
+
+# Analyze
+if analyze_btn and (error_input or code_input):
+    input_to_use = error_input + "\n\n" + code_input
+    redacted_input = redact_pii(input_to_use) if privacy_mode else input_to_use
+    
+    log_activity(input_to_use, redacted_input, "Pending", "Privacy" if privacy_mode else "Public")
+    
+    with st.spinner("Analyzing securely..."):
+        prompt = f"""Expert debugger. Error+code (PII redacted):
+        
+        {redacted_input}
+
+        Explain the error for a {level} programmer.
+        JSON output: {{"meaning":"","cause":"","fix_code":"","prevention":""}}"""
+        
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1, max_tokens=1500
+            )
+            result_content = response.choices[0].message.content
+            
+            # Attempt to parse JSON
             try:
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.5,
-                    max_tokens=500,
-                )
-                result = response.choices[0].message.content
-                st.markdown(result)
+                result = json.loads(result_content)
+                log_activity(input_to_use, redacted_input, str(result), "Success")
+                
+                # Render Results
+                for k, v in result.items():
+                    if 'code' in k:
+                        st.code(v, "python")
+                    else:
+                        st.markdown(f"**{k.title()}:** {v}")
+            except json.JSONDecodeError:
+                st.markdown(result_content)
+                log_activity(input_to_use, redacted_input, result_content, "Partial Success (Non-JSON)")
+                    
+        except Exception as e:
+            log_activity(input_to_use, redacted_input, str(e), "Error")
+            st.error(f"Error: {e}")
 
-                # Log the error explanation
-                new_entry = {
-                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Error Message": st.session_state.error_text[:100] + "...",
-                    "Level": level,
-                    "Model": model
-                }
-                df_log = pd.read_csv(LOG_FILE)
-                df_log = pd.concat([df_log, pd.DataFrame([new_entry])], ignore_index=True)
-                df_log.to_csv(LOG_FILE, index=False)
-            except Exception as e:
-                st.error(f"⚠️ API Error: {str(e)}")
-
-st.divider()
-
-# --- History Section ---
-with st.expander("🕒 View Explanation History"):
-    try:
-        df_history = pd.read_csv(LOG_FILE)
-        if not df_history.empty:
-            st.dataframe(df_history.tail(10), use_container_width=True)
-        else:
-            st.info("No history found.")
-    except Exception as e:
-        st.error(f"Error loading history: {e}")
-
-st.info("💡 Tip: Try pasting errors from Python, C++, or JavaScript — AI CodeSense will decode them instantly!")
+st.info("👨‍💼 Enterprise: Set GROQ_PROXY_URL in secrets for private routing. Logs saved locally.")
