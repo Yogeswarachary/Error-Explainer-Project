@@ -1,7 +1,16 @@
 import streamlit as st
 import os
+import pandas as pd
+from datetime import datetime
 from groq import Groq
 from dotenv import load_dotenv
+
+# File to store error logs
+LOG_FILE = "error_log.csv"
+
+# Initialize log file if it doesn't exist
+if not os.path.exists(LOG_FILE):
+    pd.DataFrame(columns=["Timestamp", "Error Message", "Level", "Model"]).to_csv(LOG_FILE, index=False)
 
 # Load API Key
 load_dotenv()
@@ -89,8 +98,31 @@ if explain_btn:
                 )
                 result = response.choices[0].message.content
                 st.markdown(result)
+
+                # Log the error explanation
+                new_entry = {
+                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Error Message": st.session_state.error_text[:100] + "...",
+                    "Level": level,
+                    "Model": model
+                }
+                df_log = pd.read_csv(LOG_FILE)
+                df_log = pd.concat([df_log, pd.DataFrame([new_entry])], ignore_index=True)
+                df_log.to_csv(LOG_FILE, index=False)
             except Exception as e:
                 st.error(f"⚠️ API Error: {str(e)}")
 
 st.divider()
+
+# --- History Section ---
+with st.expander("🕒 View Explanation History"):
+    try:
+        df_history = pd.read_csv(LOG_FILE)
+        if not df_history.empty:
+            st.dataframe(df_history.tail(10), use_container_width=True)
+        else:
+            st.info("No history found.")
+    except Exception as e:
+        st.error(f"Error loading history: {e}")
+
 st.info("💡 Tip: Try pasting errors from Python, C++, or JavaScript — AI CodeSense will decode them instantly!")

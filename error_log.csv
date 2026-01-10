@@ -1,0 +1,2 @@
+Timestamp,Error Message,Level,Model
+2026-01-10 11:58:19,NameError: This app has encountered an error. The original error message is redacted to prevent data...,Beginner,llama-3.1-8b-instant
